@@ -1,0 +1,70 @@
+# =========================
+# 🔐 VARIABLES SENSIBLES
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# 🐍 PYTHON / FLASK
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Entornos virtuales
+venv/
+.env/
+.venv/
+
+# =========================
+# 📱 FLUTTER / DART
+# =========================
+.dart_tool/
+.packages
+.pub/
+build/
+
+# Archivos generados
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# Android
+android/.gradle/
+android/app/build/
+
+# =========================
+# 💻 SISTEMA OPERATIVO
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# 🧰 EDITORES
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# 📦 DEPENDENCIAS (si usas Node en algo)
+# =========================
+node_modules/
+
+# =========================
+# 🧪 LOGS Y TEMPORALES
+# =========================
+*.log
+*.tmp
+
+# =========================
+# 🗄️ BASE DE DATOS (LOCAL)
+# =========================
+*.db
+*.sqlite
+
+# =========================
+# 📤 EXPORTACIONES (opcional)
+# =========================
+exports/
