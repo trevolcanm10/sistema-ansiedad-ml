@@ -34,7 +34,7 @@ Desarrollar una aplicación móvil que evalúe el estado emocional de los estudi
 ## 🧠 Tecnologías Utilizadas
 
 * **Frontend:** Flutter (MVVM)
-* **Backend:** Flask - Python (Arquitectura tipo MVC)
+* **Backend:** Java - Spring Boot (Arquitectura MVC)
 * **Base de Datos:** MySQL
 * **Machine Learning:** Python
 
@@ -44,7 +44,7 @@ Desarrollar una aplicación móvil que evalúe el estado emocional de los estudi
 
 Flutter (Aplicación móvil - Vista)
 ↓
-Flask API (Lógica de negocio y controladores)
+Spring Boot API (Lógica de negocio y controladores)
 ↓
 Base de Datos (Modelo) + Motor de Machine Learning
 
@@ -53,7 +53,7 @@ Base de Datos (Modelo) + Motor de Machine Learning
 ## 📂 Estructura del Proyecto
 
 * `/frontend` → Aplicación móvil desarrollada en Flutter
-* `/backend` → API REST desarrollada en Flask
+* `/backend` → API REST desarrollada en Java (Spring Boot)
 * `/database` → Scripts de base de datos (SQL)
 * `/ml` → Modelo de Machine Learning
 * `/docs` → Documentación del proyecto
@@ -65,7 +65,6 @@ Base de Datos (Modelo) + Motor de Machine Learning
 * **Frontend:** Patrón MVVM (Modelo - Vista - ViewModel)
 * **Backend:** Patrón MVC adaptado
 * **Sistema global:** Arquitectura Cliente-Servidor
-
 
 ---
 
