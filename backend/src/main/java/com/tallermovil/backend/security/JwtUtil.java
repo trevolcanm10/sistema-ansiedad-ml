@@ -87,12 +87,14 @@ public class JwtUtil {
      * @param email El correo electrónico del usuario autenticado
      * @return String El token JWT generado (cadena de texto compacta)
      */
-    public String generateToken(String email) {
+    public String generateToken(String email, String role) {
 
         // Construye el token JWT usando el builder fluido de JJWT
         return Jwts.builder()
                 // Establece el 'subject' (asunto) como el email del usuario
                 .setSubject(email)
+                // Establece el 'role' (rol) del usuario
+                .claim("role", role)
                 // Marca la fecha/hora actual como momento de emisión
                 .setIssuedAt(new Date())
                 // Calcula y establece la fecha de expiración:
@@ -167,5 +169,16 @@ public class JwtUtil {
             // IllegalArgumentException: Token es null o está vacío
             return false;
         }
+    }
+
+    // Obtiene el rol (role) del usuario contenido en el token
+    public String extractRole(String token) {
+
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role", String.class);
     }
 }

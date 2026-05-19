@@ -106,7 +106,9 @@ public class AuthController {
                     ));
         }
 
-        String token = jwtUtil.generateToken(usuario.getEmail());
+        String token = jwtUtil.generateToken(
+                usuario.getEmail(),
+                usuario.getRole().name());
 
         return ResponseEntity.ok(
                 new LoginResponse(token)
