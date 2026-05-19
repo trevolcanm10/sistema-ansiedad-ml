@@ -58,6 +58,7 @@ public class AuthController {
                 .edad(request.getEdad())
                 .carrera(request.getCarrera())
                 .semestre(request.getSemestre())
+                .role(request.getRole())
                 .fechaRegistro(LocalDateTime.now())
                 .build();
 

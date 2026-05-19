@@ -1,5 +1,7 @@
 package com.tallermovil.backend.dto;
 
+import com.tallermovil.backend.model.Role;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,6 +11,7 @@ public class RegisterRequest {
     private String nombre;
     private String email;
     private String password;
+    private Role role;
     private Integer edad;
     private String carrera;
     private Integer semestre;
