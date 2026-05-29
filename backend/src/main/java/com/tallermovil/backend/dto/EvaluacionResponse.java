@@ -23,7 +23,7 @@ public class EvaluacionResponse {
     /** Mensaje de confirmación */
     private String mensaje;
 
-    /** Nivel de riesgo predicho (BAJO, MODERADO, ALTO) */
+    /** Nivel de riesgo predicho (BAJO o ALTO) */
     private String nivelRiesgo;
 
     /** Confianza de la predicción (0.0 a 1.0) */

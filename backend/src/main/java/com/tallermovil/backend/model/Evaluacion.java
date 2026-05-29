@@ -47,7 +47,7 @@ public class Evaluacion {
 
     // === RESULTADO DE LA PREDICCIÓN ML ===
 
-    /** Nivel de riesgo predicho por el modelo ML (BAJO, MODERADO, ALTO) */
+    /** Nivel de riesgo predicho por el modelo ML (LOW o HIGH) */
     @Enumerated(EnumType.STRING)
     @Column(name = "mental_health_status")
     private MentalHealthStatus mentalHealthStatus;
@@ -55,7 +55,7 @@ public class Evaluacion {
     /** Confianza de la predicción (0.0 a 1.0) */
     private Double confianza;
 
-    /** Votos de los modelos como JSON (ej: {"BAJO":0,"MODERADO":2,"ALTO":4}) */
+    /** Votos de los modelos como JSON (ej: {"ALTO":5,"BAJO":1}) */
     @Column(columnDefinition = "TEXT")
     private String votosJson;
 

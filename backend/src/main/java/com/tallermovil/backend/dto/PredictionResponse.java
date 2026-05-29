@@ -15,8 +15,8 @@ import lombok.Setter;
  * {
  *   "nivel_riesgo": "ALTO",
  *   "confianza": 0.83,
- *   "votos": {"BAJO": 0, "MODERADO": 2, "ALTO": 4},
- *   "predicciones": {"Random Forest": "ALTO", "XGBoost": "ALTO", ...},
+ *   "votos": {"ALTO": 5, "BAJO": 1},
+ *   "predicciones": {"Random Forest": "ALTO", "XGBoost": "BAJO", ...},
  *   "recomendaciones": ["Recomendación 1", "Recomendación 2", ...]
  * }
  */
@@ -26,14 +26,11 @@ import lombok.Setter;
 @AllArgsConstructor
 public class PredictionResponse {
 
-    /** Nivel de riesgo final (BAJO, MODERADO, ALTO) */
+    /** Nivel de riesgo final (ALTO o BAJO) */
     private String nivel_riesgo;
 
     /** Confianza de la predicción (0.0 a 1.0) */
     private Double confianza;
-
-    /** Score clínico basado en reglas (0-100) */
-    private Double score_clinico;
 
     /** Votos de cada modelo por categoría */
     private Map<String, Integer> votos;

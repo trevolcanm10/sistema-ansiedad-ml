@@ -3,7 +3,7 @@ API Flask para predicción de riesgo de ansiedad.
 
 Carga 6 modelos de Machine Learning (.pkl) y expone un endpoint REST
 para recibir los datos del cuestionario y retornar la predicción
-del nivel de riesgo de ansiedad (BAJO, MODERADO, ALTO).
+del nivel de riesgo de ansiedad (ALTO o BAJO) usando Ensemble por votos.
 
 Los modelos fueron entrenados únicamente con 7 variables en formato PascalCase:
   PHQ9, GAD7, OnlineStress, FinancialStress, ExerciseFreq, SocialActivity, SleepHours
@@ -11,8 +11,8 @@ Los modelos fueron entrenados únicamente con 7 variables en formato PascalCase:
 El backend Java envía 15 variables en camelCase. Este servicio:
   1. Valida las 15 variables camelCase
   2. Mapea las 7 necesarias a PascalCase para los modelos
-  3. Calcula un score clínico basado en reglas con los 15 features
-  4. Retorna nivel de riesgo + recomendaciones personalizadas
+  3. Ejecuta los 6 modelos y cada uno vota ALTO o BAJO
+  4. Retorna nivel de riesgo por mayoría + recomendaciones personalizadas
 
 Modelos cargados:
   1. Random Forest
@@ -123,45 +123,75 @@ def build_model_dataframe(data):
     return pd.DataFrame(model_data, columns=MODEL_FEATURES)
 
 
-def calcular_score_clinico(features):
+def ejecutar_prediccion(features_df):
     """
-    Calcula un score clínico de riesgo de ansiedad (0-100) basado en
-    los 15 features usando reglas clínicas establecidas.
+    Ejecuta la predicción usando Ensemble por votos de los 6 modelos ML.
 
-    Basado en PHQ-9, GAD-7 y factores de riesgo psicosocial.
+    Cada modelo predice ALTO (1) o BAJO (0).
+    El resultado final es el que tenga más votos.
+    La confianza = modelos que votaron ganador / total de modelos.
     """
-    score = 0.0
+    # 1. Cada modelo vota ALTO o BAJO
+    # IMPORTANTE: Los modelos fueron entrenados con:
+    #   clase 0 = ALTO riesgo, clase 1 = BAJO riesgo
+    # Por lo tanto, invertimos la interpretación.
+    votos = {"ALTO": 0, "BAJO": 0}
+    predicciones = {}
+    probabilidades = {}
 
-    # === FACTORES CLAVE (60 pts máximo) ===
-    # PHQ-9 (Depresión) 0-27 → 20 pts
-    score += (features.get("phq9", 0) / 27.0) * 20.0
-    # GAD-7 (Ansiedad) 0-21 → 20 pts
-    score += (features.get("gad7", 0) / 21.0) * 20.0
-    # Estrés académico 0-10 → 10 pts
-    score += (features.get("academicStress", 5) / 10.0) * 10.0
-    # Estrés financiero 0-10 → 10 pts
-    score += (features.get("financialStress", 5) / 10.0) * 10.0
+    for model_name, model in models.items():
+        display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name)
+        try:
+            if hasattr(model, "predict_proba"):
+                proba = model.predict_proba(features_df)
+                prob_clase_1 = float(proba[0][1])  # Probabilidad de clase 1 (BAJO)
+                probabilidades[display_name] = prob_clase_1
 
-    # === FACTORES MODERADORES (25 pts máximo) ===
-    # Estrés online 0-10 → 8 pts
-    score += (features.get("onlineStress", 5) / 10.0) * 8.0
-    # Calidad del sueño 0-10 (invertido) → 8 pts
-    score += ((10.0 - features.get("sleepQuality", 5)) / 10.0) * 8.0
-    # Horas de sueño (invertido) → 5 pts
-    sleep_h = features.get("sleepHours", 7)
-    if sleep_h < 5:
-        score += 5.0
-    elif sleep_h < 7:
-        score += 2.5
-    # Autoeficacia 0-10 (invertido) → 4 pts
-    score += ((10.0 - features.get("selfEfficacy", 5)) / 10.0) * 4.0
+                # Predicción binaria: prob_clase_1 >= 0.5 → BAJO, sino → ALTO
+                # (invertido porque clase 0 = ALTO, clase 1 = BAJO)
+                nivel = "BAJO" if prob_clase_1 >= 0.5 else "ALTO"
+                predicciones[display_name] = nivel
+                votos[nivel] += 1
 
-    # === FACTORES PROTECTORES (restan riesgo) ===
-    score -= (features.get("exerciseFreq", 3) / 7.0) * 5.0
-    score -= (features.get("socialActivity", 5) / 10.0) * 5.0
-    score -= (features.get("familySupport", 5) / 10.0) * 5.0
+                print(f"  {display_name}: prob_BAJO={prob_clase_1:.4f} → {nivel}")
+            else:
+                # Modelos sin predict_proba (usar predict directo)
+                raw_pred = model.predict(features_df)
+                label = int(raw_pred[0])
+                nivel = "BAJO" if label == 1 else "ALTO"
+                predicciones[display_name] = nivel
+                votos[nivel] += 1
 
-    return round(max(0.0, min(100.0, score)), 2)
+                print(f"  {display_name}: predicción_cruda={label} → {nivel}")
+        except Exception as e:
+            print(f"  ⚠️ Error en {display_name}: {str(e)}")
+
+    # 2. Determinar resultado por mayoría de votos
+    total_modelos = sum(votos.values())
+    if total_modelos == 0:
+        nivel_riesgo = "BAJO"
+        confianza = 0.0
+    else:
+        if votos["ALTO"] > votos["BAJO"]:
+            nivel_riesgo = "ALTO"
+            confianza = votos["ALTO"] / total_modelos
+        elif votos["BAJO"] > votos["ALTO"]:
+            nivel_riesgo = "BAJO"
+            confianza = votos["BAJO"] / total_modelos
+        else:
+            # Empate: usar la probabilidad promedio para decidir
+            promedio_prob = np.mean(list(probabilidades.values())) if probabilidades else 0.5
+            nivel_riesgo = "BAJO" if promedio_prob >= 0.5 else "ALTO"
+            confianza = 0.5  # Empate = confianza baja
+
+    # Redondear confianza a 2 decimales
+    confianza = round(confianza, 2)
+
+    print(f"\n  Resultado final: {nivel_riesgo}")
+    print(f"  Votos: {votos}")
+    print(f"  Confianza: {confianza}")
+
+    return nivel_riesgo, confianza, votos, predicciones
 
 
 def get_recomendaciones(nivel_riesgo, features):
@@ -171,9 +201,6 @@ def get_recomendaciones(nivel_riesgo, features):
     if nivel_riesgo == "ALTO":
         recomendaciones.append("🔴 Se recomienda consultar con un profesional de salud mental de forma urgente.")
         recomendaciones.append("📞 Si estás en crisis, contacta la línea de ayuda: 106 (SALUD MENTAL - Perú).")
-    elif nivel_riesgo == "MODERADO":
-        recomendaciones.append("🟡 Considera agendar una cita con el orientador psicológico de tu universidad.")
-        recomendaciones.append("📝 Lleva un diario emocional para identificar tus patrones de estrés.")
     else:
         recomendaciones.append("🟢 Tu nivel de riesgo es bajo. ¡Sigue cuidando tu bienestar!")
 
@@ -201,79 +228,6 @@ def get_recomendaciones(nivel_riesgo, features):
         recomendaciones.append("🌐 El estrés digital es alto. Toma descansos de redes sociales.")
 
     return recomendaciones
-
-
-def ejecutar_prediccion(features_df, data_features):
-    """
-    Ejecuta la predicción usando score clínico (100% determinante)
-    y probabilidades ML como referencia informativa.
-
-    Los modelos ML son binarios y no discriminan entre niveles de riesgo,
-    por lo que el score clínico es el determinante principal.
-    """
-    # 1. Score clínico
-    score_clinico = calcular_score_clinico(data_features)
-    print(f"\n  Score clínico: {score_clinico}/100")
-
-    # 2. Probabilidades ML (solo informativo)
-    probabilidades_clase_1 = []
-    for model_name, model in models.items():
-        try:
-            if hasattr(model, "predict_proba"):
-                proba = model.predict_proba(features_df)
-                prob_clase_1 = float(proba[0][1])
-                probabilidades_clase_1.append(prob_clase_1)
-                print(f"  {MODEL_DISPLAY_NAMES.get(model_name, model_name)}: prob_riesgo={prob_clase_1:.6f}")
-        except Exception:
-            pass
-
-    # 3. Score final = 100% clínico
-    score_final = score_clinico
-    print(f"  Score final (100% clínico): {score_final}/100")
-
-    # 4. Mapear a nivel de riesgo
-    if score_final >= 55:
-        nivel_riesgo = "ALTO"
-    elif score_final >= 30:
-        nivel_riesgo = "MODERADO"
-    else:
-        nivel_riesgo = "BAJO"
-
-    # 5. Confianza
-    if score_final >= 70 or score_final <= 15:
-        confianza = 0.9
-    elif score_final >= 55 or score_final >= 30:
-        confianza = 0.7
-    else:
-        confianza = 0.6
-
-    # 6. Votos y predicciones
-    votos = {"BAJO": 0, "MODERADO": 0, "ALTO": 0}
-    predicciones = {}
-
-    if score_clinico >= 55:
-        predicciones["Score Clínico"] = "ALTO"
-        votos["ALTO"] += 1
-    elif score_clinico >= 30:
-        predicciones["Score Clínico"] = "MODERADO"
-        votos["MODERADO"] += 1
-    else:
-        predicciones["Score Clínico"] = "BAJO"
-        votos["BAJO"] += 1
-
-    for model_name, model in models.items():
-        try:
-            if hasattr(model, "predict_proba"):
-                proba = model.predict_proba(features_df)
-                prob = float(proba[0][1])
-                nivel = "ALTO" if prob >= 0.5 else ("MODERADO" if prob >= 0.2 else "BAJO")
-                predicciones[MODEL_DISPLAY_NAMES.get(model_name, model_name)] = nivel
-                votos[nivel] += 1
-        except Exception:
-            pass
-
-    print(f"  Nivel final: {nivel_riesgo} (confianza: {confianza})")
-    return nivel_riesgo, confianza, votos, predicciones, score_clinico
 
 
 # ============================================================
@@ -320,13 +274,12 @@ def predict():
     except KeyError as e:
         return jsonify({"error": f"Error al mapear: {str(e)}"}), 400
 
-    nivel_riesgo, confianza, votos, predicciones, score_clinico = ejecutar_prediccion(features_df, data)
+    nivel_riesgo, confianza, votos, predicciones = ejecutar_prediccion(features_df)
     recomendaciones = get_recomendaciones(nivel_riesgo, data)
 
     return jsonify({
         "nivel_riesgo": nivel_riesgo,
         "confianza": confianza,
-        "score_clinico": score_clinico,
         "votos": votos,
         "predicciones": predicciones,
         "recomendaciones": recomendaciones,
@@ -363,7 +316,16 @@ def predict_single(model_name):
     try:
         raw_pred = found_model.predict(features_df)
         label = int(raw_pred[0]) if isinstance(raw_pred[0], (np.integer, int, np.floating)) else str(raw_pred[0])
-        return jsonify({"modelo": MODEL_DISPLAY_NAMES.get(found_key, found_key), "prediccion_cruda": str(label)})
+        nivel = "BAJO" if label == 1 else "ALTO"
+
+        result = {"modelo": MODEL_DISPLAY_NAMES.get(found_key, found_key), "prediccion": nivel}
+
+        if hasattr(found_model, "predict_proba"):
+            proba = found_model.predict_proba(features_df)
+            result["probabilidad_BAJO"] = round(float(proba[0][1]), 4)
+            result["probabilidad_ALTO"] = round(float(proba[0][0]), 4)
+
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

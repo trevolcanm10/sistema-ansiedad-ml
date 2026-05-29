@@ -217,7 +217,7 @@ public class EvaluacionController {
     /**
      * Mapea el nivel de riesgo retornado por el ML al enum MentalHealthStatus.
      * 
-     * @param nivelRiesgo String del ML: "BAJO", "MODERADO", "ALTO", "NO_DISPONIBLE"
+     * @param nivelRiesgo String del ML: "BAJO", "ALTO", "NO_DISPONIBLE"
      * @return MentalHealthStatus correspondiente
      */
     private MentalHealthStatus mapearNivelRiesgo(String nivelRiesgo) {
@@ -225,7 +225,6 @@ public class EvaluacionController {
 
         return switch (nivelRiesgo.toUpperCase()) {
             case "BAJO" -> MentalHealthStatus.LOW;
-            case "MODERADO" -> MentalHealthStatus.MODERATE;
             case "ALTO" -> MentalHealthStatus.HIGH;
             default -> MentalHealthStatus.NO_DISPONIBLE;
         };
