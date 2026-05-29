@@ -1,8 +1,12 @@
 package com.tallermovil.backend.model;
 
+
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -11,6 +15,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 @Entity
 @Table(name = "evaluacion")
 @Getter
@@ -22,6 +27,8 @@ public class Evaluacion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private Long usuarioId;
+
+    // === FEATURES DEL CUESTIONARIO ===
     private Double phq9;
     private Double gad7;
     private Double sleepHours;
@@ -38,5 +45,24 @@ public class Evaluacion {
     private Double financialStress;
     private Double sleepQuality;
 
+    // === RESULTADO DE LA PREDICCIÓN ML ===
+
+    /** Nivel de riesgo predicho por el modelo ML (BAJO, MODERADO, ALTO) */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mental_health_status")
+    private MentalHealthStatus mentalHealthStatus;
+
+    /** Confianza de la predicción (0.0 a 1.0) */
+    private Double confianza;
+
+    /** Votos de los modelos como JSON (ej: {"BAJO":0,"MODERADO":2,"ALTO":4}) */
+    @Column(columnDefinition = "TEXT")
+    private String votosJson;
+
+    /** Predicciones individuales de cada modelo como JSON */
+    @Column(columnDefinition = "TEXT")
+    private String prediccionesJson;
+
+    /** Fecha y hora de la evaluación */
     private LocalDateTime fecha;
 }
