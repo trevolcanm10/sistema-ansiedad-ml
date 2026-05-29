@@ -32,6 +32,9 @@ public class PredictionResponse {
     /** Confianza de la predicción (0.0 a 1.0) */
     private Double confianza;
 
+    /** Score clínico basado en reglas (0-100) */
+    private Double score_clinico;
+
     /** Votos de cada modelo por categoría */
     private Map<String, Integer> votos;
 
