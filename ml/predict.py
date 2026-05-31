@@ -3,7 +3,8 @@ API Flask para predicción de riesgo de ansiedad.
 
 Carga 6 modelos de Machine Learning (.pkl) y expone un endpoint REST
 para recibir los datos del cuestionario y retornar la predicción
-del nivel de riesgo de ansiedad (ALTO o BAJO) usando Ensemble por votos.
+del nivel de riesgo de ansiedad (ALTO, MODERADO o BAJO) usando
+el promedio de probabilidades de los 6 modelos.
 
 Los modelos fueron entrenados únicamente con 7 variables en formato PascalCase:
   PHQ9, GAD7, OnlineStress, FinancialStress, ExerciseFreq, SocialActivity, SleepHours
@@ -11,8 +12,9 @@ Los modelos fueron entrenados únicamente con 7 variables en formato PascalCase:
 El backend Java envía 15 variables en camelCase. Este servicio:
   1. Valida las 15 variables camelCase
   2. Mapea las 7 necesarias a PascalCase para los modelos
-  3. Ejecuta los 6 modelos y cada uno vota ALTO o BAJO
-  4. Retorna nivel de riesgo por mayoría + recomendaciones personalizadas
+  3. Ejecuta los 6 modelos y calcula P(BAJO) promedio
+  4. Clasifica en ALTO (≤40%), MODERADO (40-70%) o BAJO (≥70%)
+  5. Retorna nivel de riesgo + recomendaciones personalizadas
 
 Modelos cargados:
   1. Random Forest
@@ -80,6 +82,21 @@ MODEL_DISPLAY_NAMES = {
 }
 
 # ============================================================
+# UMBRALES PARA LOS 3 NIVELES (ÚNICO CRITERIO DE DECISIÓN)
+# ============================================================
+# Se usa el promedio de P(BAJO) entre los 6 modelos:
+#   P(BAJO) ≤ 0.40  → ALTO
+#   0.40 < P(BAJO) ≤ 0.70  → MODERADO
+#   P(BAJO) > 0.70  → BAJO
+#
+# Los votos binarios (P(BAJO) > 0.5 → BAJO) son SOLO informativos.
+# La decisión final SIEMPRE se basa en el promedio de probabilidades.
+
+UMBRAL_ALTO = 0.40    # Por debajo de esto → ALTO
+UMBRAL_BAJO = 0.70    # Por encima de esto → BAJO
+# Entre ambos → MODERADO
+
+# ============================================================
 # CARGA DE MODELOS AL INICIAR EL SERVIDOR
 # ============================================================
 
@@ -125,84 +142,114 @@ def build_model_dataframe(data):
 
 def ejecutar_prediccion(features_df):
     """
-    Ejecuta la predicción usando Ensemble por votos de los 6 modelos ML.
-
-    Cada modelo predice ALTO (1) o BAJO (0).
-    El resultado final es el que tenga más votos.
-    La confianza = modelos que votaron ganador / total de modelos.
+    Ejecuta la predicción usando el promedio de probabilidades de los 6 modelos ML.
+    
+    ÚNICO CRITERIO: Promedio de P(BAJO) con umbrales:
+      - ALTO:     P(BAJO) promedio ≤ 0.40
+      - MODERADO: 0.40 < P(BAJO) promedio ≤ 0.70
+      - BAJO:     P(BAJO) promedio > 0.70
+    
+    Los votos binarios (threshold 0.5) son SOLO informativos, no deciden.
+    
+    NOTA: Los modelos fueron entrenados con:
+      clase 0 = ALTO riesgo, clase 1 = BAJO riesgo
+    predict_proba[0][1] = P(BAJO)
     """
-    # 1. Cada modelo vota ALTO o BAJO
-    # IMPORTANTE: Los modelos fueron entrenados con:
-    #   clase 0 = ALTO riesgo, clase 1 = BAJO riesgo
-    # Por lo tanto, invertimos la interpretación.
-    votos = {"ALTO": 0, "BAJO": 0}
-    predicciones = {}
+    # 1. Obtener P(BAJO) de cada modelo
     probabilidades = {}
+    predicciones_individuales = {}
 
     for model_name, model in models.items():
         display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name)
         try:
             if hasattr(model, "predict_proba"):
                 proba = model.predict_proba(features_df)
-                prob_clase_1 = float(proba[0][1])  # Probabilidad de clase 1 (BAJO)
-                probabilidades[display_name] = prob_clase_1
-
-                # Predicción binaria: prob_clase_1 >= 0.5 → BAJO, sino → ALTO
-                # (invertido porque clase 0 = ALTO, clase 1 = BAJO)
-                nivel = "BAJO" if prob_clase_1 >= 0.5 else "ALTO"
-                predicciones[display_name] = nivel
-                votos[nivel] += 1
-
-                print(f"  {display_name}: prob_BAJO={prob_clase_1:.4f} → {nivel}")
+                prob_bajo = float(proba[0][1])  # Probabilidad de clase 1 = BAJO
+                probabilidades[display_name] = prob_bajo
+                
+                # Voto binario SOLO informativo (threshold 0.5)
+                voto = "BAJO" if prob_bajo >= 0.5 else "ALTO"
+                predicciones_individuales[display_name] = {
+                    "voto": voto,
+                    "probabilidad_BAJO": round(prob_bajo, 4)
+                }
+                
+                print(f"  {display_name}: P(BAJO)={prob_bajo:.4f} → voto_binario={voto}")
             else:
                 # Modelos sin predict_proba (usar predict directo)
                 raw_pred = model.predict(features_df)
                 label = int(raw_pred[0])
+                prob_bajo = 1.0 if label == 1 else 0.0
+                probabilidades[display_name] = prob_bajo
                 nivel = "BAJO" if label == 1 else "ALTO"
-                predicciones[display_name] = nivel
-                votos[nivel] += 1
-
-                print(f"  {display_name}: predicción_cruda={label} → {nivel}")
+                predicciones_individuales[display_name] = {
+                    "voto": nivel,
+                    "probabilidad_BAJO": prob_bajo
+                }
+                
+                print(f"  {display_name}: predicción_cruda={label} → voto_binario={nivel}")
         except Exception as e:
             print(f"  ⚠️ Error en {display_name}: {str(e)}")
 
-    # 2. Determinar resultado por mayoría de votos
-    total_modelos = sum(votos.values())
-    if total_modelos == 0:
-        nivel_riesgo = "BAJO"
-        confianza = 0.0
+    # 2. Calcular P(BAJO) promedio (ÚNICO CRITERIO DE DECISIÓN)
+    if not probabilidades:
+        return "BAJO", 0.0, {"ALTO": 0, "BAJO": 0}, {}, 0.0
+
+    promedio_bajo = float(np.mean(list(probabilidades.values())))
+    
+    print(f"\n  P(BAJO) promedio: {promedio_bajo:.4f} (ÚNICO criterio de decisión)")
+
+    # 3. Determinar nivel por umbrales de probabilidad
+    if promedio_bajo <= UMBRAL_ALTO:
+        nivel_riesgo = "ALTO"
+    elif promedio_bajo <= UMBRAL_BAJO:
+        nivel_riesgo = "MODERADO"
     else:
-        if votos["ALTO"] > votos["BAJO"]:
-            nivel_riesgo = "ALTO"
-            confianza = votos["ALTO"] / total_modelos
-        elif votos["BAJO"] > votos["ALTO"]:
-            nivel_riesgo = "BAJO"
-            confianza = votos["BAJO"] / total_modelos
+        nivel_riesgo = "BAJO"
+
+    # 4. Calcular confianza basada en qué tan lejos está del centro del rango
+    if nivel_riesgo == "ALTO":
+        confianza = round(1.0 - (promedio_bajo / UMBRAL_ALTO), 2) if UMBRAL_ALTO > 0 else 0.0
+    elif nivel_riesgo == "BAJO":
+        confianza = round((promedio_bajo - UMBRAL_BAJO) / (1.0 - UMBRAL_BAJO), 2)
+    else:  # MODERADO
+        centro = (UMBRAL_ALTO + UMBRAL_BAJO) / 2.0  # 0.55
+        distancia_al_centro = abs(promedio_bajo - centro)
+        max_distancia = centro - UMBRAL_ALTO  # 0.15
+        if max_distancia > 0:
+            confianza_baja = distancia_al_centro / max_distancia
+            confianza = round(1.0 - confianza_baja, 2)
         else:
-            # Empate: usar la probabilidad promedio para decidir
-            promedio_prob = np.mean(list(probabilidades.values())) if probabilidades else 0.5
-            nivel_riesgo = "BAJO" if promedio_prob >= 0.5 else "ALTO"
-            confianza = 0.5  # Empate = confianza baja
+            confianza = 0.5
+    
+    confianza = max(0.0, min(1.0, confianza))
 
-    # Redondear confianza a 2 decimales
-    confianza = round(confianza, 2)
+    # 5. Votos binarios: SOLO informativos (no afectan la decisión final)
+    votos_bajo = sum(1 for p in probabilidades.values() if p > 0.5)
+    votos_alto = len(probabilidades) - votos_bajo
+    votos = {"ALTO": votos_alto, "BAJO": votos_bajo}
 
-    print(f"\n  Resultado final: {nivel_riesgo}")
-    print(f"  Votos: {votos}")
-    print(f"  Confianza: {confianza}")
+    print(f"\n  🎯 RESULTADO FINAL (por P(BAJO) promedio):")
+    print(f"     Nivel: {nivel_riesgo}")
+    print(f"     P(BAJO) promedio: {promedio_bajo:.2%}")
+    print(f"     Confianza: {confianza}")
+    print(f"     Votos binarios (solo informativo): ALTO={votos_alto}, BAJO={votos_bajo}")
 
-    return nivel_riesgo, confianza, votos, predicciones
+    return nivel_riesgo, confianza, votos, predicciones_individuales, promedio_bajo
 
 
-def get_recomendaciones(nivel_riesgo, features):
+def get_recomendaciones(nivel_riesgo, features, promedio_bajo=None):
     """Genera recomendaciones personalizadas basadas en el nivel y features."""
     recomendaciones = []
 
     if nivel_riesgo == "ALTO":
-        recomendaciones.append("🔴 Se recomienda consultar con un profesional de salud mental de forma urgente.")
+        recomendaciones.append("🔴 Tu nivel de ansiedad es ALTO. Se recomienda consultar con un profesional de salud mental de forma urgente.")
         recomendaciones.append("📞 Si estás en crisis, contacta la línea de ayuda: 106 (SALUD MENTAL - Perú).")
+    elif nivel_riesgo == "MODERADO":
+        recomendaciones.append("🟡 Tu nivel de ansiedad es MODERADO. Es recomendable buscar apoyo profesional para monitorear tu salud mental.")
+        recomendaciones.append("📋 Realiza un seguimiento de tus síntomas. Si empeoran, no dudes en consultar a un especialista.")
     else:
-        recomendaciones.append("🟢 Tu nivel de riesgo es bajo. ¡Sigue cuidando tu bienestar!")
+        recomendaciones.append("🟢 Tu nivel de riesgo es BAJO. ¡Sigue cuidando tu bienestar!")
 
     if features.get("sleepHours", 8) < 6:
         recomendaciones.append("😴 Intenta dormir al menos 7-8 horas. La falta de sueño afecta directamente la ansiedad.")
@@ -251,7 +298,7 @@ def health():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    """Endpoint principal de predicción."""
+    """Endpoint principal de predicción con 3 niveles: ALTO, MODERADO, BAJO."""
     if not models:
         return jsonify({"error": "No hay modelos cargados"}), 500
 
@@ -274,8 +321,8 @@ def predict():
     except KeyError as e:
         return jsonify({"error": f"Error al mapear: {str(e)}"}), 400
 
-    nivel_riesgo, confianza, votos, predicciones = ejecutar_prediccion(features_df)
-    recomendaciones = get_recomendaciones(nivel_riesgo, data)
+    nivel_riesgo, confianza, votos, predicciones, promedio_bajo = ejecutar_prediccion(features_df)
+    recomendaciones = get_recomendaciones(nivel_riesgo, data, promedio_bajo)
 
     return jsonify({
         "nivel_riesgo": nivel_riesgo,
@@ -283,6 +330,7 @@ def predict():
         "votos": votos,
         "predicciones": predicciones,
         "recomendaciones": recomendaciones,
+        "probabilidad_bajo_promedio": round(promedio_bajo, 4),
     })
 
 

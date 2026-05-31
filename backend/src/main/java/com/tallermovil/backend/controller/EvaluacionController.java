@@ -225,6 +225,7 @@ public class EvaluacionController {
 
         return switch (nivelRiesgo.toUpperCase()) {
             case "BAJO" -> MentalHealthStatus.LOW;
+            case "MODERADO" -> MentalHealthStatus.MODERATE;
             case "ALTO" -> MentalHealthStatus.HIGH;
             default -> MentalHealthStatus.NO_DISPONIBLE;
         };

@@ -309,7 +309,7 @@ def main():
     
     # 8. Verificar predicción de un caso conocido
     print("\n" + "=" * 60)
-    print("VERIFICACIÓN CON CASOS REALES")
+    print("VERIFICACIÓN CON CASOS REALES (3 NIVELES)")
     print("=" * 60)
     
     # Caso 1: Estudiante sano
@@ -324,45 +324,62 @@ def main():
         "ExerciseFreq": 1, "SocialActivity": 2, "SleepHours": 4
     }])
     
+    # Caso 3: Estudiante con riesgo moderado (valores intermedios)
+    caso_moderado = pd.DataFrame([{
+        "PHQ9": 8, "GAD7": 7, "OnlineStress": 5, "FinancialStress": 4,
+        "ExerciseFreq": 3, "SocialActivity": 5, "SleepHours": 6
+    }])
+    
+    def predecir_nivel(modelos, caso):
+        """Calcula el nivel usando el mismo método que predict.py (promedio de P(BAJO))."""
+        probabilidades = {}
+        for model_name, model in modelos.items():
+            display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name)
+            try:
+                if hasattr(model, "predict_proba"):
+                    proba = model.predict_proba(caso)
+                    prob_bajo = float(proba[0][1])
+                    probabilidades[display_name] = prob_bajo
+                else:
+                    raw_pred = int(model.predict(caso)[0])
+                    probabilidades[display_name] = 1.0 if raw_pred == 1 else 0.0
+            except:
+                pass
+        
+        promedio_bajo = np.mean(list(probabilidades.values()))
+        
+        if promedio_bajo <= 0.40:
+            nivel = "ALTO"
+        elif promedio_bajo <= 0.70:
+            nivel = "MODERADO"
+        else:
+            nivel = "BAJO"
+        
+        return nivel, promedio_bajo, probabilidades
+    
     print("\n  🟢 CASO BAJO (estudiante sano):")
     print("     PHQ9=3, GAD7=2, ExerciseFreq=5, SleepHours=8")
-    votos_bajo = 0
-    votos_alto = 0
-    for model_name, model in modelos.items():
-        display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name)
-        try:
-            pred = model.predict(caso_bajo)[0]
-            # Invertir: clase 0 = ALTO, clase 1 = BAJO
-            nivel = "BAJO" if pred == 1 else "ALTO"
-            if nivel == "ALTO":
-                votos_alto += 1
-            else:
-                votos_bajo += 1
-            print(f"     {display_name}: {nivel}")
-        except:
-            pass
-    resultado_bajo = "ALTO" if votos_alto > votos_bajo else "BAJO"
-    print(f"     → Resultado ensemble: {resultado_bajo} (ALTO={votos_alto}, BAJO={votos_bajo})")
+    nivel_bajo, prob_bajo, probs_bajo = predecir_nivel(modelos, caso_bajo)
+    for name, p in probs_bajo.items():
+        print(f"     {name}: P(BAJO)={p:.4f}")
+    print(f"     → P(BAJO) promedio: {prob_bajo:.2%}")
+    print(f"     → Nivel: {nivel_bajo}")
+    
+    print("\n  🟡 CASO MODERADO (estudiante con riesgo moderado):")
+    print("     PHQ9=8, GAD7=7, ExerciseFreq=3, SleepHours=6")
+    nivel_mod, prob_mod, probs_mod = predecir_nivel(modelos, caso_moderado)
+    for name, p in probs_mod.items():
+        print(f"     {name}: P(BAJO)={p:.4f}")
+    print(f"     → P(BAJO) promedio: {prob_mod:.2%}")
+    print(f"     → Nivel: {nivel_mod}")
     
     print("\n  🔴 CASO ALTO (estudiante en riesgo):")
     print("     PHQ9=20, GAD7=18, ExerciseFreq=1, SleepHours=4")
-    votos_bajo = 0
-    votos_alto = 0
-    for model_name, model in modelos.items():
-        display_name = MODEL_DISPLAY_NAMES.get(model_name, model_name)
-        try:
-            pred = model.predict(caso_alto)[0]
-            # Invertir: clase 0 = ALTO, clase 1 = BAJO
-            nivel = "BAJO" if pred == 1 else "ALTO"
-            if nivel == "ALTO":
-                votos_alto += 1
-            else:
-                votos_bajo += 1
-            print(f"     {display_name}: {nivel}")
-        except:
-            pass
-    resultado_alto = "ALTO" if votos_alto > votos_bajo else "BAJO"
-    print(f"     → Resultado ensemble: {resultado_alto} (ALTO={votos_alto}, BAJO={votos_bajo})")
+    nivel_alto, prob_alto, probs_alto = predecir_nivel(modelos, caso_alto)
+    for name, p in probs_alto.items():
+        print(f"     {name}: P(BAJO)={p:.4f}")
+    print(f"     → P(BAJO) promedio: {prob_alto:.2%}")
+    print(f"     → Nivel: {nivel_alto}")
     
     print("\n" + "=" * 60)
     print("  TEST COMPLETADO")
