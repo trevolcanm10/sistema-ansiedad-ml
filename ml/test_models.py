@@ -348,9 +348,9 @@ def main():
         
         promedio_bajo = np.mean(list(probabilidades.values()))
         
-        if promedio_bajo <= 0.40:
+        if promedio_bajo <= 0.15:
             nivel = "ALTO"
-        elif promedio_bajo <= 0.70:
+        elif promedio_bajo <= 0.50:
             nivel = "MODERADO"
         else:
             nivel = "BAJO"
@@ -358,7 +358,7 @@ def main():
         return nivel, promedio_bajo, probabilidades
     
     print("\n  🟢 CASO BAJO (estudiante sano):")
-    print("     PHQ9=3, GAD7=2, ExerciseFreq=5, SleepHours=8")
+    print("     PHQ9=0, GAD7=0, ExerciseFreq=5, SleepHours=8")
     nivel_bajo, prob_bajo, probs_bajo = predecir_nivel(modelos, caso_bajo)
     for name, p in probs_bajo.items():
         print(f"     {name}: P(BAJO)={p:.4f}")

@@ -13,7 +13,7 @@ El backend Java envía 15 variables en camelCase. Este servicio:
   1. Valida las 15 variables camelCase
   2. Mapea las 7 necesarias a PascalCase para los modelos
   3. Ejecuta los 6 modelos y calcula P(BAJO) promedio
-  4. Clasifica en ALTO (≤40%), MODERADO (40-70%) o BAJO (≥70%)
+  4. Clasifica en ALTO (≤15%), MODERADO (15-50%) o BAJO (≥50%)
   5. Retorna nivel de riesgo + recomendaciones personalizadas
 
 Modelos cargados:
@@ -84,16 +84,18 @@ MODEL_DISPLAY_NAMES = {
 # ============================================================
 # UMBRALES PARA LOS 3 NIVELES (ÚNICO CRITERIO DE DECISIÓN)
 # ============================================================
-# Se usa el promedio de P(BAJO) entre los 6 modelos:
-#   P(BAJO) ≤ 0.40  → ALTO
-#   0.40 < P(BAJO) ≤ 0.70  → MODERADO
-#   P(BAJO) > 0.70  → BAJO
+# Se usa el promedio de P(BAJO) entre los 6 modelos.
+# Los valores se determinaron experimentalmente con diagnostico_umbrales.py:
+#
+#   P(BAJO) ≤ 0.15  → ALTO    (PHQ9≥6 y GAD7≥6, o PHQ9≥9)
+#   0.15 < P(BAJO) ≤ 0.50  → MODERADO  (zona de transición)
+#   P(BAJO) > 0.50  → BAJO   (PHQ9=0-3 con GAD7 bajo)
 #
 # Los votos binarios (P(BAJO) > 0.5 → BAJO) son SOLO informativos.
 # La decisión final SIEMPRE se basa en el promedio de probabilidades.
 
-UMBRAL_ALTO = 0.40    # Por debajo de esto → ALTO
-UMBRAL_BAJO = 0.70    # Por encima de esto → BAJO
+UMBRAL_ALTO = 0.15    # Por debajo de esto → ALTO
+UMBRAL_BAJO = 0.50    # Por encima de esto → BAJO
 # Entre ambos → MODERADO
 
 # ============================================================
@@ -145,9 +147,9 @@ def ejecutar_prediccion(features_df):
     Ejecuta la predicción usando el promedio de probabilidades de los 6 modelos ML.
     
     ÚNICO CRITERIO: Promedio de P(BAJO) con umbrales:
-      - ALTO:     P(BAJO) promedio ≤ 0.40
-      - MODERADO: 0.40 < P(BAJO) promedio ≤ 0.70
-      - BAJO:     P(BAJO) promedio > 0.70
+      - ALTO:     P(BAJO) promedio ≤ 0.15
+      - MODERADO: 0.15 < P(BAJO) promedio ≤ 0.50
+      - BAJO:     P(BAJO) promedio > 0.50
     
     Los votos binarios (threshold 0.5) son SOLO informativos, no deciden.
     
@@ -213,9 +215,9 @@ def ejecutar_prediccion(features_df):
     elif nivel_riesgo == "BAJO":
         confianza = round((promedio_bajo - UMBRAL_BAJO) / (1.0 - UMBRAL_BAJO), 2)
     else:  # MODERADO
-        centro = (UMBRAL_ALTO + UMBRAL_BAJO) / 2.0  # 0.55
+        centro = (UMBRAL_ALTO + UMBRAL_BAJO) / 2.0  # 0.325
         distancia_al_centro = abs(promedio_bajo - centro)
-        max_distancia = centro - UMBRAL_ALTO  # 0.15
+        max_distancia = centro - UMBRAL_ALTO  # 0.175
         if max_distancia > 0:
             confianza_baja = distancia_al_centro / max_distancia
             confianza = round(1.0 - confianza_baja, 2)
