@@ -35,9 +35,12 @@ class AuthViewModel extends ChangeNotifier {
     try {
       final data = await _apiService.login(email, password);
       _token = data['token'] as String?;
+      _role = data['role'] as String?;
       _isLoggedIn = true;
-      // Extraer role del token o de la respuesta
-      // Por ahora lo dejamos vacío, se puede mejorar con JWT decode
+      // Guardar role en SharedPreferences
+      if (_role != null) {
+        await _apiService.saveRole(_role!);
+      }
       _isLoading = false;
       notifyListeners();
       return true;

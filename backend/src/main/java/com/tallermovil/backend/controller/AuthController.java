@@ -111,7 +111,7 @@ public class AuthController {
                 usuario.getRole().name());
 
         return ResponseEntity.ok(
-                new LoginResponse(token)
+                new LoginResponse(token, usuario.getRole().name())
         );
     }
 }

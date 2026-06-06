@@ -105,30 +105,36 @@ class _HomeViewState extends State<HomeView> {
             ),
             const SizedBox(height: 24),
 
-            // Botón Nueva Evaluación
-            SizedBox(
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const EvaluationView()),
-                  );
-                },
-                icon: const Icon(Icons.assignment_rounded, size: 28),
-                label: const Text(
-                  'NUEVA EVALUACIÓN',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            // Botón Nueva Evaluación (solo para estudiantes)
+            Consumer<AuthViewModel>(
+              builder: (_, auth, _) {
+                final esEstudiante = auth.role == 'ROLE_ESTUDIANTE';
+                if (!esEstudiante) return const SizedBox.shrink();
+                return SizedBox(
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const EvaluationView()),
+                      );
+                    },
+                    icon: const Icon(Icons.assignment_rounded, size: 28),
+                    label: const Text(
+                      'NUEVA EVALUACIÓN',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
             const SizedBox(height: 24),
 

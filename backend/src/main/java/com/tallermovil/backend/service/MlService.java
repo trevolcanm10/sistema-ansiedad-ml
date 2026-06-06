@@ -82,7 +82,9 @@ public class MlService {
             }
 
         } catch (Exception e) {
-            log.error("Error al conectar con el servicio ML: {}", e.getMessage());
+            log.error("Error al conectar con el servicio ML: {} | URL: {} | Tipo: {}",
+                    e.getMessage(), url, e.getClass().getSimpleName());
+            log.error("Detalle del error: ", e);
             return crearRespuestaDefault();
         }
     }

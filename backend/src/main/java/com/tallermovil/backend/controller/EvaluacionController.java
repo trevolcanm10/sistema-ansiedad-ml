@@ -75,6 +75,16 @@ public class EvaluacionController {
         log.info("Usuario: {} ({})", usuario.getNombre(), email);
 
         // ================================================================
+        //  PASO 1.5: VALIDAR QUE SOLO ESTUDIANTES PUEDAN EVALUARSE
+        // ================================================================
+
+        if (usuario.getRole() != com.tallermovil.backend.model.Role.ROLE_ESTUDIANTE) {
+            EvaluacionResponse respuestaError = new EvaluacionResponse();
+            respuestaError.setMensaje("Solo los estudiantes pueden realizar evaluaciones.");
+            return respuestaError;
+        }
+
+        // ================================================================
         //  PASO 2: CONSTRUIR LA ENTIDAD "Evaluacion" CON LOS DATOS RECIBIDOS
         // ================================================================
 
