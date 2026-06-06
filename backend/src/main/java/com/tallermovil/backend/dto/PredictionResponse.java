@@ -35,8 +35,8 @@ public class PredictionResponse {
     /** Votos de cada modelo por categoría */
     private Map<String, Integer> votos;
 
-    /** Predicción individual de cada modelo */
-    private Map<String, String> predicciones;
+    /** Predicción individual de cada modelo (puede ser String o Map anidado) */
+    private Map<String, Object> predicciones;
 
     /** Lista de recomendaciones personalizadas */
     private List<String> recomendaciones;
