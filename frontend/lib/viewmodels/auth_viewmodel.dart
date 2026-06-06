@@ -16,9 +16,21 @@ class AuthViewModel extends ChangeNotifier {
   String? get role => _role;
   bool get isLoggedIn => _isLoggedIn;
 
+  /// Inicializa la sesión desde SharedPreferences al arrancar la app
+  void setLoggedIn(String role) {
+    _role = role;
+    _isLoggedIn = true;
+    notifyListeners();
+  }
+
   Future<void> checkSession() async {
     final savedToken = await _apiService.getToken();
     final savedRole = await _apiService.getRole();
+    // Si hay token pero role es null/vacío, forzar logout (datos corruptos)
+    if (savedToken != null && (savedRole == null || savedRole.isEmpty)) {
+      await logout();
+      return;
+    }
     if (savedToken != null && savedRole != null) {
       _token = savedToken;
       _role = savedRole;
@@ -36,11 +48,17 @@ class AuthViewModel extends ChangeNotifier {
       final data = await _apiService.login(email, password);
       _token = data['token'] as String?;
       _role = data['role'] as String?;
-      _isLoggedIn = true;
-      // Guardar role en SharedPreferences
-      if (_role != null) {
-        await _apiService.saveRole(_role!);
+      
+      // Si el backend no devuelve role, usar default
+      if (_role == null || _role!.isEmpty) {
+        _error = 'El servidor no devolvió el rol del usuario. Reconstruye el backend.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
+      
+      _isLoggedIn = true;
+      await _apiService.saveRole(_role!);
       _isLoading = false;
       notifyListeners();
       return true;

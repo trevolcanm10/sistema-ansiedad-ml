@@ -133,7 +133,6 @@ class ApiService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      // Si no tiene nivelRiesgo, significa que no hay evaluaciones
       if (data['nivelRiesgo'] == null) return null;
       return PredictionResponse.fromJson({
         'nivel_riesgo': data['nivelRiesgo'],
@@ -144,5 +143,88 @@ class ApiService {
       });
     }
     return null;
+  }
+
+  // ============================================================
+  // ADMIN
+  // ============================================================
+
+  Future<List<Map<String, dynamic>>> listarUsuariosAdmin() async {
+    final token = await getToken();
+    if (token == null) throw Exception('No autenticado');
+
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/admin/usuarios'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body) as List);
+    }
+    throw Exception('Error al listar usuarios');
+  }
+
+  Future<List<Map<String, dynamic>>> listarEvaluacionesAdmin() async {
+    final token = await getToken();
+    if (token == null) throw Exception('No autenticado');
+
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/admin/evaluaciones'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body) as List);
+    }
+    throw Exception('Error al listar evaluaciones');
+  }
+
+  Future<Map<String, dynamic>> obtenerStatsAdmin() async {
+    final token = await getToken();
+    if (token == null) throw Exception('No autenticado');
+
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/admin/stats'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Error al obtener estadísticas');
+  }
+
+  // ============================================================
+  // MEDICO
+  // ============================================================
+
+  Future<List<Map<String, dynamic>>> listarEstudiantesMedico() async {
+    final token = await getToken();
+    if (token == null) throw Exception('No autenticado');
+
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/medico/estudiantes'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body) as List);
+    }
+    throw Exception('Error al listar estudiantes');
+  }
+
+  Future<List<Map<String, dynamic>>> verEvaluacionesEstudiante(int estudianteId) async {
+    final token = await getToken();
+    if (token == null) throw Exception('No autenticado');
+
+    final response = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/medico/estudiantes/$estudianteId/evaluaciones'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body) as List);
+    }
+    throw Exception('Error al cargar evaluaciones del estudiante');
   }
 }

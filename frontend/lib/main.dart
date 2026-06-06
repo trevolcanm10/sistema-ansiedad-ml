@@ -1,15 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'viewmodels/auth_viewmodel.dart';
 import 'views/auth/login_view.dart';
 import 'views/home/home_view.dart';
+import 'views/admin/admin_panel.dart';
+import 'views/medico/medico_panel.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  // Leer SharedPreferences ANTES de montar la app
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final savedRole = prefs.getString('user_role');
+  final savedToken = prefs.getString('jwt_token');
+
+  runApp(
+    MyApp(
+      initialRole: savedToken != null ? savedRole : null,
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String? initialRole;
+  const MyApp({super.key, this.initialRole});
 
   @override
   Widget build(BuildContext context) {
@@ -23,48 +37,54 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
           brightness: Brightness.light,
         ),
-        home: const AuthGate(),
+        home: AuthGate(initialRole: initialRole),
       ),
     );
   }
 }
 
-/// AuthGate verifica si hay sesión activa y redirige al login o al home.
+/// AuthGate recibe el rol desde SharedPreferences al arrancar.
+/// Si no hay sesión, redirige al LoginView.
+/// Si hay sesión, redirige según el rol.
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  final String? initialRole;
+  const AuthGate({super.key, this.initialRole});
 
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
 
 class _AuthGateState extends State<AuthGate> {
-  bool _checking = true;
-
   @override
   void initState() {
     super.initState();
-    _checkSession();
-  }
-
-  Future<void> _checkSession() async {
-    await context.read<AuthViewModel>().checkSession();
-    if (mounted) setState(() => _checking = false);
+    // Al arrancar, inicializar el AuthViewModel si hay sesión guardada
+    if (widget.initialRole != null) {
+      context.read<AuthViewModel>().setLoggedIn(widget.initialRole!);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_checking) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
+    // Escuchar cambios en AuthViewModel
     return Consumer<AuthViewModel>(
       builder: (_, auth, _) {
-        if (auth.isLoggedIn) {
-          return const HomeView();
+        // Si no está logueado, mostrar login
+        if (!auth.isLoggedIn) {
+          return const LoginView();
         }
-        return const LoginView();
+
+        // Usar el role del ViewModel (se actualiza al hacer login/logout)
+        final role = auth.role;
+
+        if (role == 'ROLE_ADMIN') {
+          return const AdminPanel();
+        } else if (role == 'ROLE_MEDICO') {
+          return const MedicoPanel();
+        }
+
+        // Por defecto: Estudiante o cualquiera
+        return const HomeView();
       },
     );
   }

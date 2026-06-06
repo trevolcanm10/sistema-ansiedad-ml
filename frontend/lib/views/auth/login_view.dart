@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../viewmodels/auth_viewmodel.dart';
 import 'register_view.dart';
 import '../home/home_view.dart';
+import '../admin/admin_panel.dart';
+import '../medico/medico_panel.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -34,9 +36,18 @@ class _LoginViewState extends State<LoginView> {
     );
 
     if (success && mounted) {
+      final role = context.read<AuthViewModel>().role;
+      Widget destino;
+      if (role == 'ROLE_ADMIN') {
+        destino = const AdminPanel();
+      } else if (role == 'ROLE_MEDICO') {
+        destino = const MedicoPanel();
+      } else {
+        destino = const HomeView();
+      }
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeView()),
+        MaterialPageRoute(builder: (_) => destino),
       );
     }
   }
