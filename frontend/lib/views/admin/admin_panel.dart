@@ -17,6 +17,7 @@ class _AdminPanelState extends State<AdminPanel> {
   List<Map<String, dynamic>> _usuarios = [];
   List<Map<String, dynamic>> _evaluaciones = [];
   bool _loading = true;
+  String? _error;
   int _tabIndex = 0;
 
   @override
@@ -26,6 +27,7 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 
   Future<void> _cargarDatos() async {
+    setState(() { _loading = true; _error = null; });
     try {
       final stats = await _api.obtenerStatsAdmin();
       final usuarios = await _api.listarUsuariosAdmin();
@@ -39,7 +41,12 @@ class _AdminPanelState extends State<AdminPanel> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     }
   }
 
@@ -95,6 +102,28 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 
   Widget _buildContent() {
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(_error!, textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red, fontSize: 16)),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _cargarDatos,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     switch (_tabIndex) {
       case 0: return _buildDashboard();
       case 1: return _buildUsuarios();

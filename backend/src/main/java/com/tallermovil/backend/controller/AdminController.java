@@ -18,7 +18,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ROLE_ADMIN')")
+@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public class AdminController {
 
     private final UsuarioRepository usuarioRepository;

@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/medico")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ROLE_MEDICO')")
+@PreAuthorize("hasAuthority('ROLE_MEDICO')")
 public class MedicoController {
 
     private final EvaluacionRepository evaluacionRepository;
